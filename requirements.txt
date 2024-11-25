@@ -1,0 +1,5 @@
+# For prediction py
+tensorflow=2.13.0
+chess
+numpy
+sys
