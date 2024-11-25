@@ -180,10 +180,10 @@ def calculate_parameters(board, turn_number, elo_diff=0):
 
 def main():
     # Load the best model
-    model_path = 'saved_models/best_model.h5'  # Adjust the path if necessary
+    model_path = 'saved_models/model_1/best_model.h5'
     try:
         model = load_model(model_path, compile=False)
-        print(f"Model loaded from {model_path}")
+        print(f"\nModel loaded from {model_path}")
     except Exception as e:
         print(f"Error loading model: {e}")
         sys.exit(1)
