@@ -155,9 +155,8 @@ def calculate_control_of_key_squares(board):
     return white_control - black_control
 
 # Function to calculate all parameters
-def calculate_parameters(board, turn_number):
+def calculate_parameters(board, turn_number, elo_diff=0):
     piece_diff = calculate_piece_differential(board)
-    elo_diff = 0  # Assuming no Elo difference is provided
     mobility = calculate_mobility(board)
     king_safety = calculate_king_safety(board)
     control_of_key_squares = calculate_control_of_key_squares(board)
@@ -181,7 +180,7 @@ def calculate_parameters(board, turn_number):
 
 def main():
     # Load the best model
-    model_path = 'saved_models/best_model2.h5' 
+    model_path = 'saved_models/best_model.h5'  # Adjust the path if necessary
     try:
         model = load_model(model_path, compile=False)
         print(f"Model loaded from {model_path}")
@@ -189,7 +188,7 @@ def main():
         print(f"Error loading model: {e}")
         sys.exit(1)
 
-    # Prompt the user for FEN notation and move count
+    # Prompt the user for FEN notation
     fen = input("Enter the FEN notation of the board state: ").strip()
     try:
         board = chess.Board(fen)
@@ -197,18 +196,39 @@ def main():
         print(f"Invalid FEN notation: {e}")
         sys.exit(1)
 
-    try:
-        turn_number = int(input("Enter the move count (turn number): ").strip())
-    except ValueError:
-        print("Invalid move count. Please enter an integer.")
-        sys.exit(1)
+    # Check for the initial position
+    if board.board_fen() == chess.STARTING_BOARD_FEN:
+        print("\nPredicted Win Probability for White: 50.00%")
+        sys.exit(0)
+
+    # Prompt the user for move count (turn number), default to 55 if not provided
+    turn_number_input = input("Enter the move count (turn number) [default: 55]: ").strip()
+    if turn_number_input == '':
+        turn_number = 55
+    else:
+        try:
+            turn_number = int(turn_number_input)
+        except ValueError:
+            print("Invalid move count. Please enter an integer.")
+            sys.exit(1)
+
+    # Prompt the user for Elo difference, default to 0 if not provided
+    elo_diff_input = input("Enter the Elo difference (White Elo - Black Elo) [default: 0]: ").strip()
+    if elo_diff_input == '':
+        elo_diff = 0
+    else:
+        try:
+            elo_diff = float(elo_diff_input)
+        except ValueError:
+            print("Invalid Elo difference. Please enter a number.")
+            sys.exit(1)
 
     # Convert FEN to tensor
     board_tensor = fen_to_tensor(fen)
     X_board_input = np.expand_dims(board_tensor, axis=0)  # Add batch dimension
 
     # Calculate parameters
-    params = calculate_parameters(board, turn_number)
+    params = calculate_parameters(board, turn_number, elo_diff)
 
     # Prepare parameters for model input
     parameter_columns = [
