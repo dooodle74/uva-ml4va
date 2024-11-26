@@ -1,6 +1,9 @@
-# For prediction py
 tensorflow=2.13.0
 scikit-learn
+pandas
 chess
+re
 numpy
 sys
+csv
+matplotlib.pyplot
