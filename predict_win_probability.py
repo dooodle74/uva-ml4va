@@ -190,6 +190,15 @@ def main():
         print(f"Error loading model: {e}")
         sys.exit(1)
 
+    # Load the scalers
+    try:
+        turn_number_scaler = joblib.load('turn_number_scaler.save')
+        standard_scaler = joblib.load('standard_scaler.save')
+        print("Scalers loaded successfully.")
+    except Exception as e:
+        print(f"Error loading scalers: {e}")
+        sys.exit(1)
+
     # Prompt the user for FEN notation
     fen = input("Enter the FEN notation of the board state: ").strip()
     try:
@@ -234,56 +243,59 @@ def main():
 
     # Prepare parameters for model input
     parameter_columns = [
-        'turn_number', 'elo_diff', 'piece_diff', 'mobility', 'king_safety',
-        'control_of_key_squares', 'opening', 'middle_game', 'endgame',
+        'turn_number', 'elo_diff', 'piece_diff', 'mobility_diff', 'king_safety',
+        'control_squares', 'opening', 'middle_game', 'endgame',
         'doubled_pawns_diff', 'isolated_pawns_diff'
     ]
     params_list = [params[col] for col in parameter_columns]
     X_params = np.array([params_list], dtype=np.float32)
 
-    # Initialize the scalers
-    turn_number_scaler = MinMaxScaler()
-    standard_scaler = StandardScaler()
-
     # Split X_params into separate arrays for processing
     turn_number = X_params[:, 0].reshape(-1, 1)  # Extract `turn_number`
     elo_diff = X_params[:, 1].reshape(-1, 1)  # Extract `elo_diff`
     piece_diff = X_params[:, 2].reshape(-1, 1)  # Extract `piece_diff`
-    king_safety = X_params[:, 3].reshape(-1, 1)  # Extract `king_safety`
+    mobility_diff = X_params[:, 3].reshape(-1, 1)  # Extract `mobility_diff`
+    king_safety = X_params[:, 4].reshape(-1, 1)  # Extract `king_safety`
+    control_squares = X_params[:, 5].reshape(-1, 1)  # Extract `control_squares`
     doubled_pawns_diff = X_params[:, 9].reshape(-1, 1)  # Extract `doubled_pawns_diff`
     isolated_pawns_diff = X_params[:, 10].reshape(-1, 1)  # Extract `isolated_pawns_diff`
 
     # Binary columns: No transformation needed
     binary_features = X_params[:, 6:9]  # `opening`, `middle_game`, `endgame`
 
-    # Fit the scalers
-    turn_number_scaler.fit(turn_number)
-    standard_scaler.fit(np.concatenate([elo_diff, piece_diff, king_safety, doubled_pawns_diff, isolated_pawns_diff]))
+    # Apply scaling using loaded scalers
+    turn_number_scaled = turn_number_scaler.transform(turn_number)
+    standard_scaled_features = standard_scaler.transform(np.hstack([
+        elo_diff,
+        piece_diff,
+        mobility_diff,
+        king_safety,
+        control_squares,
+        doubled_pawns_diff,
+        isolated_pawns_diff
+    ]))
 
-    # Save the scalers
-    joblib.dump(turn_number_scaler, 'turn_number_scaler.save')
-    joblib.dump(standard_scaler, 'standard_scaler.save')
+    # Extract the scaled features
+    elo_diff_scaled = standard_scaled_features[:, 0].reshape(-1, 1)
+    piece_diff_scaled = standard_scaled_features[:, 1].reshape(-1, 1)
+    mobility_diff_scaled = standard_scaled_features[:, 2].reshape(-1, 1)
+    king_safety_scaled = standard_scaled_features[:, 3].reshape(-1, 1)
+    control_squares_scaled = standard_scaled_features[:, 4].reshape(-1, 1)
+    doubled_pawns_diff_scaled = standard_scaled_features[:, 5].reshape(-1, 1)
+    isolated_pawns_diff_scaled = standard_scaled_features[:, 6].reshape(-1, 1)
 
-
-    # Apply scaling
-    turn_number_scaled = turn_number_scaler.fit_transform(turn_number)
-    elo_diff_scaled = standard_scaler.fit_transform(elo_diff)
-    piece_diff_scaled = standard_scaler.fit_transform(piece_diff)
-    king_safety_scaled = standard_scaler.fit_transform(king_safety)
-    doubled_pawns_diff_scaled = standard_scaler.fit_transform(doubled_pawns_diff)
-    isolated_pawns_diff_scaled = standard_scaler.fit_transform(isolated_pawns_diff)
-
-    # Recombine scaled features
     X_params_input = np.hstack([
         turn_number_scaled,
         elo_diff_scaled,
         piece_diff_scaled,
+        mobility_diff_scaled, 
         king_safety_scaled,
-        X_params[:, 4:6],  # Retain unscaled features if needed
+        control_squares_scaled, 
         binary_features,  # Binary features as-is
         doubled_pawns_diff_scaled,
         isolated_pawns_diff_scaled
     ])
+
 
     # Predict the win probability
     predicted_y = model.predict([X_board_input, X_params_input])
