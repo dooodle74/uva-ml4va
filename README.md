@@ -63,3 +63,6 @@ We use our own CNN model to train the data. We first transform the board into a 
 
 ### Output Data
 One of the main problems with our idea is that we don't have a definitive prediction of a game's win probability status for every single game state - we are only given the eventual winner for training. Thus, after research and experimenting, we devised a formula, mostly linear, based on the final win party and game state, to assign a win probability to each state. Our model is now aimed to produce this prediction based on the above parameters with no knowledge of the winner.
+
+### Results
+CSV file and image plot of the latest training is located in `/saved_models/model_4`
