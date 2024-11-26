@@ -4,9 +4,7 @@ import chess
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Input, Conv2D, Flatten, Dense, Concatenate
 from tensorflow.keras.models import Model
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import sys
-import joblib
 
 # Function to convert FEN to tensor
 def fen_to_tensor(fen):
@@ -172,27 +170,43 @@ def calculate_parameters(board, turn_number, elo_diff=0):
         'mobility': mobility,
         'king_safety': king_safety,
         'control_of_key_squares': control_of_key_squares,
+        'doubled_pawns_diff': pawn_structure['doubled_pawns_diff'],
+        'isolated_pawns_diff': pawn_structure['isolated_pawns_diff'],
         'opening': game_phase['opening'],
         'middle_game': game_phase['middle_game'],
-        'endgame': game_phase['endgame'],
-        'doubled_pawns_diff': pawn_structure['doubled_pawns_diff'],
-        'isolated_pawns_diff': pawn_structure['isolated_pawns_diff']
+        'endgame': game_phase['endgame']
     }
     return params
 
+# Function to ensure all probability are between 0 and 1.
+def warp_probability(predicted_y, k=10):
+    """
+    Warp the predicted probability to be between (0, 1) exclusive, while preserving
+    values near 0.5 and warping values closer to 0 and 1.
+    
+    Parameters:
+        predicted_y (float): The raw predicted probability.
+        k (float): The steepness of the warp effect. Default is 10.
+    
+    Returns:
+        float: Warped probability.
+    """
+    raw_prob = predicted_y[0][0]
+    warped_prob = 1 / (1 + np.exp(-k * (raw_prob - 0.5)))
+    return warped_prob
 
 def main():
     # Load the best model
-    model_path = 'saved_models/model_1/best_model.h5'  # Adjust the path if necessary
+    model_path = 'saved_models/model_1/best_model.h5'  
     try:
         model = load_model(model_path, compile=False)
-        print(f"\nModel loaded from {model_path}")
+        print(f"Model loaded from {model_path}")
     except Exception as e:
         print(f"Error loading model: {e}")
         sys.exit(1)
 
     # Prompt the user for FEN notation
-    fen = input("Enter the FEN notation of the board state: ").strip()
+    fen = input("\nEnter the FEN notation of the board state: ").strip()
     try:
         board = chess.Board(fen)
     except ValueError as e:
@@ -240,45 +254,12 @@ def main():
         'doubled_pawns_diff', 'isolated_pawns_diff'
     ]
     params_list = [params[col] for col in parameter_columns]
-    X_params = np.array([params_list], dtype=np.float32)
-
-    # Manually scale parameters using provided distributions
-
-    # Dictionary of means and standard deviations for each feature
-    feature_stats = {
-        'turn_number': {'mean': 55, 'std': 20},  # Estimated based on typical game lengths
-        'elo_diff': {'mean': 0, 'std': 200},     # Estimated typical Elo difference
-        'piece_diff': {'mean': 0, 'std': 5},     # Estimated based on possible piece differences
-        'mobility': {'mean': 0, 'std': 10},      # Estimated mobility difference
-        'king_safety': {'mean': 0, 'std': 1},    # Estimated king safety difference
-        'control_of_key_squares': {'mean': 0, 'std': 2},  # Estimated control difference
-        'opening': {'mean': 0.2418, 'std': 0.4282},
-        'middle_game': {'mean': 0.3491, 'std': 0.4767},
-        'endgame': {'mean': 0.4091, 'std': 0.4917},
-        'doubled_pawns_diff': {'mean': -0.0081, 'std': 0.4818},
-        'isolated_pawns_diff': {'mean': -0.0083, 'std': 1.0888},
-    }
-
-    # Indices of features to scale
-    scale_indices = range(len(parameter_columns))
-
-    # Scale features
-    X_params_scaled = X_params.copy()
-    for idx in scale_indices:
-        feature_name = parameter_columns[idx]
-        mean = feature_stats[feature_name]['mean']
-        std = feature_stats[feature_name]['std']
-        if std != 0:
-            X_params_scaled[0, idx] = (X_params[0, idx] - mean) / std
-        else:
-            X_params_scaled[0, idx] = 0  # Avoid division by zero
+    X_params_input = np.array([params_list], dtype=np.float32)
 
     # Predict the win probability
-    predicted_y = model.predict([X_board_input, X_params_scaled])
+    predicted_y = model.predict([X_board_input, X_params_input])
     predicted_win_probability = predicted_y[0][0]
-
-    # Ensure the output is between 0 and 1
-    predicted_win_probability = max(0.0, min(1.0, predicted_win_probability))
+    predicted_win_probability = warp_probability(predicted_y)
 
     print(f"\nPredicted Win Probability for White: {predicted_win_probability * 100:.2f}%")
 
