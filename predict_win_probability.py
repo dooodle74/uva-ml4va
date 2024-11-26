@@ -172,31 +172,23 @@ def calculate_parameters(board, turn_number, elo_diff=0):
         'mobility': mobility,
         'king_safety': king_safety,
         'control_of_key_squares': control_of_key_squares,
-        'doubled_pawns_diff': pawn_structure['doubled_pawns_diff'],
-        'isolated_pawns_diff': pawn_structure['isolated_pawns_diff'],
         'opening': game_phase['opening'],
         'middle_game': game_phase['middle_game'],
-        'endgame': game_phase['endgame']
+        'endgame': game_phase['endgame'],
+        'doubled_pawns_diff': pawn_structure['doubled_pawns_diff'],
+        'isolated_pawns_diff': pawn_structure['isolated_pawns_diff']
     }
     return params
 
+
 def main():
     # Load the best model
-    model_path = 'saved_models/model_3/best_model.h5'
+    model_path = 'saved_models/model_1/best_model.h5'  # Adjust the path if necessary
     try:
         model = load_model(model_path, compile=False)
         print(f"\nModel loaded from {model_path}")
     except Exception as e:
         print(f"Error loading model: {e}")
-        sys.exit(1)
-
-    # Load the scalers
-    try:
-        turn_number_scaler = joblib.load('turn_number_scaler.save')
-        standard_scaler = joblib.load('standard_scaler.save')
-        print("Scalers loaded successfully.")
-    except Exception as e:
-        print(f"Error loading scalers: {e}")
         sys.exit(1)
 
     # Prompt the user for FEN notation
@@ -243,63 +235,51 @@ def main():
 
     # Prepare parameters for model input
     parameter_columns = [
-        'turn_number', 'elo_diff', 'piece_diff', 'mobility_diff', 'king_safety',
-        'control_squares', 'opening', 'middle_game', 'endgame',
+        'turn_number', 'elo_diff', 'piece_diff', 'mobility', 'king_safety',
+        'control_of_key_squares', 'opening', 'middle_game', 'endgame',
         'doubled_pawns_diff', 'isolated_pawns_diff'
     ]
     params_list = [params[col] for col in parameter_columns]
     X_params = np.array([params_list], dtype=np.float32)
 
-    # Split X_params into separate arrays for processing
-    turn_number = X_params[:, 0].reshape(-1, 1)  # Extract `turn_number`
-    elo_diff = X_params[:, 1].reshape(-1, 1)  # Extract `elo_diff`
-    piece_diff = X_params[:, 2].reshape(-1, 1)  # Extract `piece_diff`
-    mobility_diff = X_params[:, 3].reshape(-1, 1)  # Extract `mobility_diff`
-    king_safety = X_params[:, 4].reshape(-1, 1)  # Extract `king_safety`
-    control_squares = X_params[:, 5].reshape(-1, 1)  # Extract `control_squares`
-    doubled_pawns_diff = X_params[:, 9].reshape(-1, 1)  # Extract `doubled_pawns_diff`
-    isolated_pawns_diff = X_params[:, 10].reshape(-1, 1)  # Extract `isolated_pawns_diff`
+    # Manually scale parameters using provided distributions
 
-    # Binary columns: No transformation needed
-    binary_features = X_params[:, 6:9]  # `opening`, `middle_game`, `endgame`
+    # Dictionary of means and standard deviations for each feature
+    feature_stats = {
+        'turn_number': {'mean': 55, 'std': 20},  # Estimated based on typical game lengths
+        'elo_diff': {'mean': 0, 'std': 200},     # Estimated typical Elo difference
+        'piece_diff': {'mean': 0, 'std': 5},     # Estimated based on possible piece differences
+        'mobility': {'mean': 0, 'std': 10},      # Estimated mobility difference
+        'king_safety': {'mean': 0, 'std': 1},    # Estimated king safety difference
+        'control_of_key_squares': {'mean': 0, 'std': 2},  # Estimated control difference
+        'opening': {'mean': 0.2418, 'std': 0.4282},
+        'middle_game': {'mean': 0.3491, 'std': 0.4767},
+        'endgame': {'mean': 0.4091, 'std': 0.4917},
+        'doubled_pawns_diff': {'mean': -0.0081, 'std': 0.4818},
+        'isolated_pawns_diff': {'mean': -0.0083, 'std': 1.0888},
+    }
 
-    # Apply scaling using loaded scalers
-    turn_number_scaled = turn_number_scaler.transform(turn_number)
-    standard_scaled_features = standard_scaler.transform(np.hstack([
-        elo_diff,
-        piece_diff,
-        mobility_diff,
-        king_safety,
-        control_squares,
-        doubled_pawns_diff,
-        isolated_pawns_diff
-    ]))
+    # Indices of features to scale
+    scale_indices = range(len(parameter_columns))
 
-    # Extract the scaled features
-    elo_diff_scaled = standard_scaled_features[:, 0].reshape(-1, 1)
-    piece_diff_scaled = standard_scaled_features[:, 1].reshape(-1, 1)
-    mobility_diff_scaled = standard_scaled_features[:, 2].reshape(-1, 1)
-    king_safety_scaled = standard_scaled_features[:, 3].reshape(-1, 1)
-    control_squares_scaled = standard_scaled_features[:, 4].reshape(-1, 1)
-    doubled_pawns_diff_scaled = standard_scaled_features[:, 5].reshape(-1, 1)
-    isolated_pawns_diff_scaled = standard_scaled_features[:, 6].reshape(-1, 1)
-
-    X_params_input = np.hstack([
-        turn_number_scaled,
-        elo_diff_scaled,
-        piece_diff_scaled,
-        mobility_diff_scaled, 
-        king_safety_scaled,
-        control_squares_scaled, 
-        binary_features,  # Binary features as-is
-        doubled_pawns_diff_scaled,
-        isolated_pawns_diff_scaled
-    ])
-
+    # Scale features
+    X_params_scaled = X_params.copy()
+    for idx in scale_indices:
+        feature_name = parameter_columns[idx]
+        mean = feature_stats[feature_name]['mean']
+        std = feature_stats[feature_name]['std']
+        if std != 0:
+            X_params_scaled[0, idx] = (X_params[0, idx] - mean) / std
+        else:
+            X_params_scaled[0, idx] = 0  # Avoid division by zero
 
     # Predict the win probability
-    predicted_y = model.predict([X_board_input, X_params_input])
+    predicted_y = model.predict([X_board_input, X_params_scaled])
     predicted_win_probability = predicted_y[0][0]
+
+    # Ensure the output is between 0 and 1
+    predicted_win_probability = max(0.0, min(1.0, predicted_win_probability))
+
     print(f"\nPredicted Win Probability for White: {predicted_win_probability * 100:.2f}%")
 
 if __name__ == "__main__":
