@@ -1,5 +1,6 @@
 # For prediction py
 tensorflow=2.13.0
+scikit-learn
 chess
 numpy
 sys

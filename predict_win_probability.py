@@ -4,7 +4,9 @@ import chess
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Input, Conv2D, Flatten, Dense, Concatenate
 from tensorflow.keras.models import Model
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import sys
+import joblib
 
 # Function to convert FEN to tensor
 def fen_to_tensor(fen):
@@ -180,7 +182,7 @@ def calculate_parameters(board, turn_number, elo_diff=0):
 
 def main():
     # Load the best model
-    model_path = 'saved_models/model_1/best_model.h5'
+    model_path = 'saved_models/model_3/best_model.h5'
     try:
         model = load_model(model_path, compile=False)
         print(f"\nModel loaded from {model_path}")
@@ -237,7 +239,51 @@ def main():
         'doubled_pawns_diff', 'isolated_pawns_diff'
     ]
     params_list = [params[col] for col in parameter_columns]
-    X_params_input = np.array([params_list], dtype=np.float32)
+    X_params = np.array([params_list], dtype=np.float32)
+
+    # Initialize the scalers
+    turn_number_scaler = MinMaxScaler()
+    standard_scaler = StandardScaler()
+
+    # Split X_params into separate arrays for processing
+    turn_number = X_params[:, 0].reshape(-1, 1)  # Extract `turn_number`
+    elo_diff = X_params[:, 1].reshape(-1, 1)  # Extract `elo_diff`
+    piece_diff = X_params[:, 2].reshape(-1, 1)  # Extract `piece_diff`
+    king_safety = X_params[:, 3].reshape(-1, 1)  # Extract `king_safety`
+    doubled_pawns_diff = X_params[:, 9].reshape(-1, 1)  # Extract `doubled_pawns_diff`
+    isolated_pawns_diff = X_params[:, 10].reshape(-1, 1)  # Extract `isolated_pawns_diff`
+
+    # Binary columns: No transformation needed
+    binary_features = X_params[:, 6:9]  # `opening`, `middle_game`, `endgame`
+
+    # Fit the scalers
+    turn_number_scaler.fit(turn_number)
+    standard_scaler.fit(np.concatenate([elo_diff, piece_diff, king_safety, doubled_pawns_diff, isolated_pawns_diff]))
+
+    # Save the scalers
+    joblib.dump(turn_number_scaler, 'turn_number_scaler.save')
+    joblib.dump(standard_scaler, 'standard_scaler.save')
+
+
+    # Apply scaling
+    turn_number_scaled = turn_number_scaler.fit_transform(turn_number)
+    elo_diff_scaled = standard_scaler.fit_transform(elo_diff)
+    piece_diff_scaled = standard_scaler.fit_transform(piece_diff)
+    king_safety_scaled = standard_scaler.fit_transform(king_safety)
+    doubled_pawns_diff_scaled = standard_scaler.fit_transform(doubled_pawns_diff)
+    isolated_pawns_diff_scaled = standard_scaler.fit_transform(isolated_pawns_diff)
+
+    # Recombine scaled features
+    X_params_input = np.hstack([
+        turn_number_scaled,
+        elo_diff_scaled,
+        piece_diff_scaled,
+        king_safety_scaled,
+        X_params[:, 4:6],  # Retain unscaled features if needed
+        binary_features,  # Binary features as-is
+        doubled_pawns_diff_scaled,
+        isolated_pawns_diff_scaled
+    ])
 
     # Predict the win probability
     predicted_y = model.predict([X_board_input, X_params_input])
