@@ -1,15 +1,4 @@
 # Chess Result Prediction
-Training loop stored in `chess_model_training.ipynb`
-
-To use the model, scroll down to part 5 and manually enter the parameters.
-
-Alternatively, use `predict_win_probability.py` Python file for a more legacy version.
-
-Upon running, you are asked to input the board state given in standard FEN format. A generator can be seen here: [https://www.redhotpawn.com/chess/chess-fen-viewer.php].
-
-You are also asked to provide a move number for this move.
-
-The program will output the prediction for white win.
 
 # Project Parts and Notes (Also found in Notebook)
 
