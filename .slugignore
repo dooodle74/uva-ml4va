@@ -1,0 +1,6 @@
+chess_model_training.ipynb
+ML4VA_FinalReport.pdf
+processed_game_states.csv
+processed_game_states_truncated.csv
+model/training_log.csv
+model/training_progress.png
