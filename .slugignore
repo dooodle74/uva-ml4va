@@ -3,7 +3,6 @@ ML4VA_FinalReport.pdf
 processed_game_states_truncated.csv
 model/training_log.csv
 model/training_progress.png
-
 processed_game_states.csv
 game_states/
 final_model/
