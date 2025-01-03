@@ -9,8 +9,8 @@ import chess_model_predictor
 
 
 app = Flask(__name__)
-CORS(app)  # Optional: if you want to allow cross-origin calls
-model = load_model("model/best_model.h5")  # load your .h5 model once at startup
+CORS(app) 
+model = load_model("model/best_model.h5")
 
 @app.route("/", methods=["GET"])
 def index():
