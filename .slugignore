@@ -5,7 +5,7 @@ model/training_log.csv
 model/training_progress.png
 
 processed_game_states.csv
-game_states
-final_model
-legacy_models
+game_states/
+final_model/
+legacy_models/
 truncate_csv.py
