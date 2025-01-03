@@ -1,0 +1,5 @@
+# Original file to large. See "processed_game_states_truncated.csv" for first 100k lines
+processed_game_states.csv
+game_states
+legacy_models
+truncate_csv.py
