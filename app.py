@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import chess
 import numpy as np
-import tensorflow as tf
 from keras.models import load_model
 
 import chess_model_predictor
