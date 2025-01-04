@@ -182,7 +182,7 @@ def fen_to_tensor(fen):
 
     return board_tensor
 
-tf.get_logger().setLevel('ERROR')
+# tf.get_logger().setLevel('ERROR')
 
 def predict_from_fen(fen, model_path="best_model.h5"):
     # Load the model
