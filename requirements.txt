@@ -4,6 +4,6 @@ Flask==3.1.0
 flask_cors==5.0.0
 numpy==2.2.1
 pandas
-tensorflow-cpu==2.10
-keras==2.10
+tensorflow-cpu==2.16.1
+keras==2.16.1
 tqdm==4.67.1
