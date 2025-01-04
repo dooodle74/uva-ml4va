@@ -5,8 +5,7 @@ import re
 from collections import Counter
 from tqdm import tqdm
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import load_model
+from keras.models import load_model
 import sys
 
 def calculate_piece_differential(board):
